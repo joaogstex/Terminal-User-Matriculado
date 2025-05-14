@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,24 +14,36 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.com.ecoground.user.user_ecoground.dto.NovoUsuarioRequest;
 import br.com.ecoground.user.user_ecoground.entity.Matriculado;
+import br.com.ecoground.user.user_ecoground.exception.MatriculadoException;
 import br.com.ecoground.user.user_ecoground.model.UsuarioIntelbras;
 import br.com.ecoground.user.user_ecoground.repository.MatriculadoRepository;
-import br.com.ecoground.user.user_ecoground.service.UsuarioService;
+import br.com.ecoground.user.user_ecoground.service.impl.UsuarioServiceImpl;
 
 @RestController
 @RequestMapping("/api/usuarios")
 public class UsuarioController {
 
-    private final UsuarioService usuarioService;
+    private final UsuarioServiceImpl usuarioService;
     private final MatriculadoRepository matriculadoRepository;
 
-    public UsuarioController(UsuarioService usuarioService, MatriculadoRepository matriculadoRepository) {
+    public UsuarioController(UsuarioServiceImpl usuarioService, MatriculadoRepository matriculadoRepository) {
         this.usuarioService = usuarioService;
         this.matriculadoRepository = matriculadoRepository;
     }
 
+    @GetMapping("/consultar-terminal/{matricula}")
+    public ResponseEntity<String> consultarUsuarioNoTerminal(@PathVariable String matricula) {
+        try {
+            String dadosUsuario = usuarioService.consultarUsuarioNoTerminal(matricula);
+            return ResponseEntity.ok(dadosUsuario);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao consultar usuário: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/enviar/{matricula}")
-    public ResponseEntity<?> enviarUsuario(@PathVariable String matricula) {
+    public ResponseEntity<?> enviarUsuario(@PathVariable String matricula) throws Exception {
         try {
             Matriculado matriculado = matriculadoRepository.findByMatricula(matricula)
                     .orElseThrow(() -> new RuntimeException("Matrícula não encontrada"));
@@ -53,13 +67,13 @@ public class UsuarioController {
             );
             usuarioService.enviarParaTerminal(usuario);
             return ResponseEntity.ok("Usuário enviado com sucesso!");
-        } catch (Exception e) {
+        } catch (MatriculadoException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro: " + e.getMessage());
         }
     }
 
     @PostMapping("/cadastrar-novo")
-    public ResponseEntity<Void> cadastrarNovoUsuario(@RequestBody NovoUsuarioRequest request) {
+    public ResponseEntity<Void> cadastrarNovoUsuario(@RequestBody NovoUsuarioRequest request) throws Exception {
         try {
             usuarioService.cadastrarNovoUsuario(
                     request.getUserId(),
@@ -68,12 +82,20 @@ public class UsuarioController {
                     request.getTipoUsuario(),
                     request.getAutoridade(),
                     request.getValidoDe(),
-                    request.getValidoAte()
-                    );
+                    request.getValidoAte());
             return ResponseEntity.ok().build();
-        } catch (Exception e) {
+        } catch (MatriculadoException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
+    @DeleteMapping("/deletar-terminal/{matricula}")
+    public ResponseEntity<Void> deletarUsuarioDoTerminal(@PathVariable String matricula) throws Exception {
+        try {
+            usuarioService.deletarDoTerminal(matricula);
+            return ResponseEntity.ok().build();
+        } catch (MatriculadoException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
